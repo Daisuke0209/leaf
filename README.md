@@ -24,6 +24,11 @@ Client-only static site (Next.js `output: "export"`) — no server, no secrets.
 - **Entry points**: [/drive/open](src/app/drive/open/page.tsx) and
   [/drive/new](src/app/drive/new/page.tsx) parse the Drive UI `state` param;
   the editor lives at `/edit/?file=<fileId>`.
+- **Collaboration** (optional): real-time co-editing via
+  [Liveblocks + Yjs](src/lib/collab.ts) — one room per Drive file, shared
+  cursors, title synced through the Yjs doc. The room's awareness "leader"
+  is the only client that autosaves to Drive. Enabled by setting
+  `NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_KEY`; without it the editor runs solo.
 
 ## Development
 

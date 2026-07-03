@@ -6,11 +6,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ConnectButton from "@/components/ConnectButton";
 import Editor, { type EditorHandle } from "@/components/Editor";
 import {
+  collabEnabled,
+  isLeader,
+  joinCollabRoom,
+  onceSynced,
+  userColor,
+  type CollabSession,
+} from "@/lib/collab";
+import {
   DriveNotFoundError,
   getMarkdownFile,
   updateMarkdownFile,
 } from "@/lib/google/drive";
-import { AuthNeededError } from "@/lib/google/gis";
+import { AuthNeededError, getStoredProfile } from "@/lib/google/gis";
 
 type SaveStatus = "saved" | "unsaved" | "saving" | "error" | "auth";
 
@@ -30,11 +38,20 @@ interface PageEditorProps {
   fileId: string;
 }
 
+/**
+ * NOTE: must be rendered with `key={fileId}` — the collaboration session is
+ * created once per mount and doesn't follow fileId changes.
+ */
 export default function PageEditor({ fileId }: PageEditorProps) {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [initialMarkdown, setInitialMarkdown] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<SaveStatus>("saved");
+
+  // Created once per mount (client-only component, StrictMode off).
+  const [collab] = useState<CollabSession | null>(() =>
+    collabEnabled() ? joinCollabRoom(fileId) : null
+  );
 
   const editorRef = useRef<EditorHandle>(null);
   // Latest title, readable from the debounced save callback.
@@ -43,6 +60,11 @@ export default function PageEditor({ fileId }: PageEditorProps) {
   const lastSavedRef = useRef({ title: "", markdown: "" });
   const saveTimerRef = useRef<number | null>(null);
   const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    if (collab === null) return;
+    return () => collab.leave();
+  }, [collab]);
 
   // Note: doesn't reset loadState to "loading" itself — the initial state
   // already is, and retry callers set it before invoking. All state updates
@@ -81,6 +103,12 @@ export default function PageEditor({ fileId }: PageEditorProps) {
   }, [load]);
 
   const doSave = useCallback(async () => {
+    // In a shared room only the leader writes to Drive; everyone converges
+    // to the same content via Yjs, so one writer is enough.
+    if (collab !== null && !isLeader(collab)) {
+      setStatus("saved");
+      return;
+    }
     const doc = {
       title: titleRef.current,
       markdown: editorRef.current?.getMarkdown() ?? lastSavedRef.current.markdown,
@@ -101,7 +129,7 @@ export default function PageEditor({ fileId }: PageEditorProps) {
       // Content stays in the editor; the next edit (or reconnect) retries.
       setStatus(err instanceof AuthNeededError ? "auth" : "error");
     }
-  }, [fileId]);
+  }, [fileId, collab]);
 
   const scheduleSave = useCallback(() => {
     setStatus("unsaved");
@@ -114,9 +142,38 @@ export default function PageEditor({ fileId }: PageEditorProps) {
     }, AUTOSAVE_DELAY_MS);
   }, [doSave]);
 
+  // Shared title: adopt the room's title (it may be ahead of Drive), seed it
+  // for a brand-new room, and follow remote changes.
+  useEffect(() => {
+    if (collab === null || loadState !== "loaded") return;
+    const { meta, provider } = collab;
+
+    const adoptRemoteTitle = () => {
+      const remote = meta.get("title");
+      if (typeof remote === "string" && remote !== titleRef.current) {
+        titleRef.current = remote;
+        setTitle(remote);
+      }
+    };
+
+    const unsubscribe = onceSynced(provider, () => {
+      if (meta.get("title") === undefined) {
+        meta.set("title", titleRef.current);
+      } else {
+        adoptRemoteTitle();
+      }
+    });
+    meta.observe(adoptRemoteTitle);
+    return () => {
+      unsubscribe();
+      meta.unobserve(adoptRemoteTitle);
+    };
+  }, [collab, loadState]);
+
   const handleTitleChange = (value: string) => {
     titleRef.current = value;
     setTitle(value);
+    collab?.meta.set("title", value);
     scheduleSave();
   };
 
@@ -163,6 +220,9 @@ export default function PageEditor({ fileId }: PageEditorProps) {
     return null;
   }
 
+  const profile = getStoredProfile();
+  const userName = profile?.name ?? profile?.email ?? "Anonymous";
+
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between text-sm text-gray-500">
@@ -196,10 +256,11 @@ export default function PageEditor({ fileId }: PageEditorProps) {
         className="mb-4 w-full bg-transparent text-4xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
       />
       <Editor
-        key={fileId}
         ref={editorRef}
         initialMarkdown={initialMarkdown}
         onDirty={scheduleSave}
+        collab={collab ?? undefined}
+        user={{ name: userName, color: userColor(userName) }}
       />
     </div>
   );

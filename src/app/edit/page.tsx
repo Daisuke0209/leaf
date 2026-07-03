@@ -29,7 +29,8 @@ function EditInner() {
       </div>
     );
   }
-  return <PageEditor fileId={fileId} />;
+  // Keyed so the collaboration session is torn down/recreated per file.
+  return <PageEditor key={fileId} fileId={fileId} />;
 }
 
 export default function EditPage() {

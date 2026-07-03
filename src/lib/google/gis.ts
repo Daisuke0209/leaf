@@ -2,11 +2,11 @@
  * Browser-side Google auth via Google Identity Services (GIS) token client.
  *
  * No server, no client secret: the browser gets short-lived (~1h) access
- * tokens directly from Google. There is no refresh token — when a token
- * expires we first try a silent re-request (works while the user has an
- * active Google session and prior consent); if Google requires interaction
- * the caller gets `AuthNeededError` and must call `connectInteractive()`
- * from a user gesture (popup blockers).
+ * tokens directly from Google. There is no refresh token, and GIS token
+ * requests always go through a popup — which browsers block unless the
+ * request comes from a user gesture. So `getAccessToken()` never talks to
+ * GIS: it returns the cached token or throws `AuthNeededError`, and the UI
+ * surfaces a button whose click handler calls `connectInteractive()`.
  *
  * Scopes: `drive.file` (only files the app created or the user opened with
  * it), `drive.install` (puts Leaf in Drive's "Open with"/"New" menus),
@@ -217,40 +217,45 @@ function requestToken(): Promise<string> {
   });
 }
 
-// Single-flight: concurrent callers (e.g. parallel Drive requests) share one
-// token request instead of racing multiple GIS popups.
-let inflight: Promise<string> | null = null;
-
 /**
- * Returns a valid access token, silently re-requesting one when possible.
- * Throws `AuthNeededError` when Google requires user interaction — the
- * caller should surface a `ConnectButton`.
+ * Returns the cached access token, or throws `AuthNeededError` when there
+ * is none — the caller should surface a `ConnectButton`. Never opens the
+ * GIS popup itself: without a user gesture it would only get blocked.
  */
 export async function getAccessToken(): Promise<string> {
   const cached = readCachedToken();
   if (cached !== null) {
     return cached.token;
   }
-  if (inflight === null) {
-    inflight = (async () => {
-      try {
-        await loadGis();
-        return await requestToken();
-      } finally {
-        inflight = null;
-      }
-    })();
-  }
-  return inflight;
+  throw new AuthNeededError();
 }
+
+// Single-flight: a double-click shares one popup instead of opening two.
+let inflight: Promise<string> | null = null;
 
 /**
  * Interactive connect — must be called from a user gesture (click), or the
  * popup gets blocked. Also fetches and stores the profile for the UI and
- * for `hint` on future silent requests.
+ * for `hint` on future token requests.
  */
 export async function connectInteractive(): Promise<string> {
-  const token = await getAccessToken();
+  const cached = readCachedToken();
+  let token: string;
+  if (cached !== null) {
+    token = cached.token;
+  } else {
+    if (inflight === null) {
+      inflight = (async () => {
+        try {
+          await loadGis();
+          return await requestToken();
+        } finally {
+          inflight = null;
+        }
+      })();
+    }
+    token = await inflight;
+  }
   try {
     const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: { Authorization: `Bearer ${token}` },
