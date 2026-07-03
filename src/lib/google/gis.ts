@@ -20,7 +20,11 @@ const SCOPE =
 
 /** localStorage: account hint for silent token requests + UI label. */
 const PROFILE_KEY = "leaf_profile";
-/** sessionStorage: token cache so a reload within ~1h needs no popup. */
+/**
+ * localStorage: token cache (~1h) shared across tabs — Drive's "New"/"Open
+ * with" open a fresh tab each time, which must reuse the token instead of
+ * asking the user to reconnect per tab.
+ */
 const TOKEN_KEY = "leaf_token";
 
 const EXPIRY_MARGIN_MS = 60_000;
@@ -130,7 +134,7 @@ interface CachedToken {
 }
 
 function readCachedToken(): CachedToken | null {
-  const parsed = safeRead(sessionStorage, TOKEN_KEY) as CachedToken | null;
+  const parsed = safeRead(localStorage, TOKEN_KEY) as CachedToken | null;
   if (
     parsed === null ||
     typeof parsed.token !== "string" ||
@@ -143,7 +147,7 @@ function readCachedToken(): CachedToken | null {
 
 /** Drops the cached token, e.g. after the API rejects it with 401. */
 export function evictToken(): void {
-  safeRemove(sessionStorage, TOKEN_KEY);
+  safeRemove(localStorage, TOKEN_KEY);
 }
 
 // The profile is exposed as a tiny external store (subscribe + cached
@@ -199,7 +203,7 @@ function requestToken(): Promise<string> {
           reject(new AuthNeededError());
           return;
         }
-        safeWrite(sessionStorage, TOKEN_KEY, {
+        safeWrite(localStorage, TOKEN_KEY, {
           token: response.access_token,
           expiresAt:
             Date.now() +
