@@ -1,28 +1,41 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Warm paper + leaf green, drawn from the app icon. */
+  --background: #faf8f3;
+  --foreground: #1c1b18;
+  --muted: #8a867c;
+  --border: #e9e4d8;
+  --accent: #3f7c48;
+  --accent-soft: #eaf1e6;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border-soft: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #141311;
+    --foreground: #edebe4;
+    --muted: #98948a;
+    --border: #2b2924;
+    --accent: #6fae78;
+    --accent-soft: #22301f;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 /*
@@ -35,4 +48,6 @@ body {
   padding-inline: 0;
   /* Let the empty area below the last block accept clicks to start typing. */
   min-height: 60vh;
+  /* Sit on the page's paper background instead of the library's white. */
+  background: transparent;
 }

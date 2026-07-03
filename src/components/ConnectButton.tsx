@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { connectInteractive } from "@/lib/google/gis";
 
 export const primaryClasses =
-  "rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-85 disabled:opacity-50";
+  "rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50";
 
 interface ConnectButtonProps {
   /** Retry hook run after a successful connect (profile subscribers are notified regardless). */
