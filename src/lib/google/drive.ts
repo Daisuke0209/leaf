@@ -134,25 +134,41 @@ export async function createMarkdownFile(
   return created.id;
 }
 
+export interface MarkdownFilePage extends PageDocument {
+  /** Whether the current user may edit the file (Drive role). */
+  canEdit: boolean;
+}
+
 /**
- * Fetches a page as `{ title, markdown }`. The title lives in the file name,
- * so this needs a metadata request in addition to the content download; the
- * two are independent and run in parallel.
+ * Fetches a page as `{ title, markdown, canEdit }`. Title and capabilities
+ * live in the file metadata, so this needs a metadata request in addition
+ * to the content download; the two are independent and run in parallel.
  */
-export async function getMarkdownFile(fileId: string): Promise<PageDocument> {
+export async function getMarkdownFile(
+  fileId: string
+): Promise<MarkdownFilePage> {
   const encodedId = encodeURIComponent(fileId);
 
   const [metaRes, contentRes] = await Promise.all([
-    driveFetch(`${DRIVE_API}/files/${encodedId}?fields=name`),
+    driveFetch(
+      `${DRIVE_API}/files/${encodedId}?fields=name,capabilities(canEdit)`
+    ),
     driveFetch(`${DRIVE_API}/files/${encodedId}?alt=media`),
   ]);
   await ensureOk(metaRes, "File metadata", fileId);
   await ensureOk(contentRes, "File download", fileId);
 
-  const meta = (await metaRes.json()) as { name: string };
+  const meta = (await metaRes.json()) as {
+    name: string;
+    capabilities?: { canEdit?: boolean };
+  };
   const markdown = await contentRes.text();
 
-  return { title: titleFromFileName(meta.name), markdown };
+  return {
+    title: titleFromFileName(meta.name),
+    markdown,
+    canEdit: meta.capabilities?.canEdit === true,
+  };
 }
 
 /**

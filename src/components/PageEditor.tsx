@@ -47,11 +47,12 @@ export default function PageEditor({ fileId }: PageEditorProps) {
   const [initialMarkdown, setInitialMarkdown] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<SaveStatus>("saved");
+  const [canEdit, setCanEdit] = useState(true);
 
-  // Created once per mount (client-only component, StrictMode off).
-  const [collab] = useState<CollabSession | null>(() =>
-    collabEnabled() ? joinCollabRoom(fileId) : null
-  );
+  // Joined only after the Drive load succeeds — the auth worker verifies
+  // Drive access before issuing a room token, and joining any earlier would
+  // ship room data to browsers that can't read the file.
+  const [collab, setCollab] = useState<CollabSession | null>(null);
 
   const editorRef = useRef<EditorHandle>(null);
   // Latest title, readable from the debounced save callback.
@@ -74,9 +75,13 @@ export default function PageEditor({ fileId }: PageEditorProps) {
       .then((doc) => {
         if (cancelledRef.current) return;
         titleRef.current = doc.title;
-        lastSavedRef.current = doc;
+        lastSavedRef.current = { title: doc.title, markdown: doc.markdown };
         setTitle(doc.title);
         setInitialMarkdown(doc.markdown);
+        setCanEdit(doc.canEdit);
+        if (collabEnabled()) {
+          setCollab(joinCollabRoom(fileId));
+        }
         setLoadState("loaded");
       })
       .catch((err: unknown) => {
@@ -158,7 +163,9 @@ export default function PageEditor({ fileId }: PageEditorProps) {
 
     const unsubscribe = onceSynced(provider, () => {
       if (meta.get("title") === undefined) {
-        meta.set("title", titleRef.current);
+        if (canEdit) {
+          meta.set("title", titleRef.current);
+        }
       } else {
         adoptRemoteTitle();
       }
@@ -168,7 +175,7 @@ export default function PageEditor({ fileId }: PageEditorProps) {
       unsubscribe();
       meta.unobserve(adoptRemoteTitle);
     };
-  }, [collab, loadState]);
+  }, [collab, loadState, canEdit]);
 
   const handleTitleChange = (value: string) => {
     titleRef.current = value;
@@ -243,7 +250,7 @@ export default function PageEditor({ fileId }: PageEditorProps) {
               status === "error" || status === "auth" ? "text-red-600" : undefined
             }
           >
-            {STATUS_LABEL[status]}
+            {canEdit ? STATUS_LABEL[status] : "Read-only"}
           </span>
         </span>
       </div>
@@ -253,6 +260,7 @@ export default function PageEditor({ fileId }: PageEditorProps) {
         onChange={(e) => handleTitleChange(e.target.value)}
         placeholder="Untitled"
         aria-label="Page title"
+        readOnly={!canEdit}
         className="mb-4 w-full bg-transparent text-4xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
       />
       <Editor
@@ -261,6 +269,7 @@ export default function PageEditor({ fileId }: PageEditorProps) {
         onDirty={scheduleSave}
         collab={collab ?? undefined}
         user={{ name: userName, color: userColor(userName) }}
+        editable={canEdit}
       />
     </div>
   );

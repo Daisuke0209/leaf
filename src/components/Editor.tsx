@@ -22,6 +22,8 @@ interface EditorProps {
   /** When set, the editor collaborates over this session's Yjs doc. */
   collab?: CollabSession;
   user?: { name: string; color: string };
+  /** False for Drive viewers: the editor renders read-only. */
+  editable?: boolean;
   ref?: Ref<EditorHandle>;
 }
 
@@ -36,6 +38,7 @@ export default function Editor({
   onDirty,
   collab,
   user,
+  editable = true,
   ref,
 }: EditorProps) {
   const editor = useCreateBlockNote(
@@ -65,8 +68,10 @@ export default function Editor({
     }
     // Collaboration: wait for the room state, then seed the Drive markdown
     // only if the room is brand new (empty fragment, nobody else in it).
+    // Viewers never seed — their updates would be rejected server-side.
     return onceSynced(collab.provider, () => {
       if (
+        editable &&
         collab.fragment.length === 0 &&
         initialMarkdown.trim() !== "" &&
         isAlone(collab.provider)
@@ -76,7 +81,7 @@ export default function Editor({
       }
       loadingRef.current = false;
     });
-  }, [editor, initialMarkdown, collab]);
+  }, [editor, initialMarkdown, collab, editable]);
 
   useImperativeHandle(
     ref,
@@ -89,6 +94,7 @@ export default function Editor({
   return (
     <BlockNoteView
       editor={editor}
+      editable={editable}
       onChange={() => {
         if (!loadingRef.current) {
           onDirty();

@@ -28,7 +28,13 @@ Client-only static site (Next.js `output: "export"`) — no server, no secrets.
   [Liveblocks + Yjs](src/lib/collab.ts) — one room per Drive file, shared
   cursors, title synced through the Yjs doc. The room's awareness "leader"
   is the only client that autosaves to Drive. Enabled by setting
-  `NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_KEY`; without it the editor runs solo.
+  `NEXT_PUBLIC_LIVEBLOCKS_AUTH_URL`; without it the editor runs solo.
+  Room access follows Drive's own ACL: a tiny stateless
+  [auth worker](worker/index.ts) checks — with the user's Google token —
+  that the file is readable right now before issuing a room token
+  (Drive editors get write access, viewers read-only). Deploy it with
+  `npx wrangler deploy -c worker/wrangler.jsonc` and set its
+  `LIVEBLOCKS_SECRET_KEY` via `wrangler secret put`.
 
 ## Development
 
