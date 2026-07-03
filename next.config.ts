@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Client-only app: everything runs in the browser (GIS auth + Drive REST),
+  // so the site is a pure static export — host it anywhere.
+  output: "export",
+  // Emit /edit/index.html instead of /edit.html so any static host resolves
+  // the URL without extensionless-HTML support.
+  trailingSlash: true,
+  // BlockNote is incompatible with React StrictMode (double-mount breaks the editor)
+  reactStrictMode: false,
 };
 
 export default nextConfig;

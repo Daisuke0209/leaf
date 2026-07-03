@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Leaf
 
-## Getting Started
+A Markdown editor for Google Drive with a Notion-style writing experience.
 
-First, run the development server:
+Google Drive is the file manager; Leaf is just the editor. Pages are plain
+`.md` files (MIME `text/markdown`) living wherever you keep them in Drive:
+
+- **New**: in Drive, choose *New → More → Leaf* — creates a Markdown file in
+  the current folder and opens the editor.
+- **Open**: right-click a Markdown file → *Open with → Leaf*.
+
+## Architecture
+
+Client-only static site (Next.js `output: "export"`) — no server, no secrets.
+
+- **Auth**: [Google Identity Services token client](src/lib/google/gis.ts).
+  The browser gets short-lived access tokens directly; when silent re-auth
+  isn't possible, UI surfaces a "Connect Google Drive" button.
+- **Storage**: [Drive REST called directly from the browser](src/lib/google/drive.ts)
+  with the `drive.file` scope (the app can only see files it created or the
+  user opened with it).
+- **Editor**: [BlockNote](https://www.blocknotejs.org/) (MPL-2.0), converting
+  Markdown ↔ blocks on load/save.
+- **Entry points**: [/drive/open](src/app/drive/open/page.tsx) and
+  [/drive/new](src/app/drive/new/page.tsx) parse the Drive UI `state` param;
+  the editor lives at `/edit/?file=<fileId>`.
+
+## Development
 
 ```bash
-npm run dev
-# or
+cp .env.example .env.local   # set NEXT_PUBLIC_GOOGLE_CLIENT_ID
+yarn install
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The OAuth client (Google Cloud Console → Credentials, type "Web application")
+must list the app's origin under **Authorized JavaScript origins**
+(`http://localhost:3000` for dev). No redirect URI or client secret is used.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+yarn build                                            # emits out/
+npx wrangler pages deploy out --project-name=leaf   # Cloudflare Pages
+```
 
-## Learn More
+Production: https://leaf-dlm.pages.dev
 
-To learn more about Next.js, take a look at the following resources:
+## Drive UI integration (Google Cloud Console)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Drive API → *Drive UI integration* tab:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Open URL: `https://leaf-dlm.pages.dev/drive/open/`
+- New URL: `https://leaf-dlm.pages.dev/drive/new/`
+- Default MIME type / extension: `text/markdown` / `md`
+- Icons: upload from [branding/](branding/)

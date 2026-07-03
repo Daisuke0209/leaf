@@ -24,3 +24,15 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * BlockNote overrides. The extra `.bn-container` raises specificity above
+ * the library's own `.bn-editor` rule, which is imported after this file
+ * and would otherwise win.
+ */
+.bn-container .bn-editor {
+  /* Align content with the page title (library default: 54px). */
+  padding-inline: 0;
+  /* Let the empty area below the last block accept clicks to start typing. */
+  min-height: 60vh;
+}
