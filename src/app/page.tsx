@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useSyncExternalStore } from "react";
 
 import ConnectButton, { primaryClasses } from "@/components/ConnectButton";
@@ -25,9 +26,12 @@ export default function Home() {
 
   if (profile === null) {
     return (
-      <main className="mx-auto w-full max-w-xl px-6 py-16">
-        <h1 className="mb-4 text-2xl font-bold">Leaf</h1>
-        <p className="mb-6 text-sm text-gray-500">
+      <main className="mx-auto w-full max-w-xl px-6 py-20">
+        <div className="mb-6 flex items-center gap-3">
+          <Image src="/icon.png" alt="" width={40} height={40} className="rounded-[10px]" />
+          <h1 className="text-3xl font-bold tracking-tight">Leaf</h1>
+        </div>
+        <p className="mb-8 text-sm leading-relaxed text-muted">
           A Markdown editor for Google Drive, with a Notion-style writing
           experience. Connect Leaf to your Drive to get started.
         </p>
@@ -37,40 +41,40 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-xl px-6 py-16">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Leaf</h1>
+    <main className="mx-auto w-full max-w-xl px-6 py-20">
+      <div className="mb-10 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">
+          <Image src="/icon.png" alt="" width={40} height={40} className="rounded-[10px]" />
+          <h1 className="text-3xl font-bold tracking-tight">Leaf</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted">
             {profile.name ?? profile.email ?? ""}
           </span>
           <button
             type="button"
             onClick={() => void disconnect()}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
+            className="rounded-md border border-border-soft px-3 py-2 text-sm hover:bg-accent-soft"
           >
             Disconnect
           </button>
         </div>
       </div>
 
-      <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+      <p className="mb-4 text-sm text-muted">
         You’re connected. Leaf works from Google Drive:
       </p>
-      <ul className="mb-8 list-disc space-y-2 pl-5 text-sm text-gray-600 dark:text-gray-400">
+      <ul className="mb-10 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted">
         <li>
-          <strong>New page</strong>: in Drive, choose New → More → Leaf to
-          create a Markdown file where you are.
+          <strong className="text-foreground">New page</strong>: in Drive,
+          choose New → More → Leaf to create a Markdown file where you are.
         </li>
         <li>
-          <strong>Edit</strong>: right-click a Markdown file → Open with →
-          Leaf.
+          <strong className="text-foreground">Edit</strong>: right-click a
+          Markdown file → Open with → Leaf.
         </li>
       </ul>
-      <a
-        href="https://drive.google.com"
-        className={`inline-block ${primaryClasses}`}
-      >
+      <a href="https://drive.google.com" className={`inline-block ${primaryClasses}`}>
         Open Google Drive
       </a>
     </main>

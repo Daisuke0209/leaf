@@ -5,10 +5,31 @@ import "@blocknote/mantine/style.css";
 
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
-import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useSyncExternalStore,
+  type Ref,
+} from "react";
 import type { Awareness } from "y-protocols/awareness";
 
 import { isAlone, onceSynced, type CollabSession } from "@/lib/collab";
+
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+/** Follows the OS color scheme so the editor matches the page chrome. */
+function usePrefersDark(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia(DARK_QUERY);
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(DARK_QUERY).matches,
+    () => false
+  );
+}
 
 export interface EditorHandle {
   /** Serializes the current document to Markdown (lossy). */
@@ -41,6 +62,7 @@ export default function Editor({
   editable = true,
   ref,
 }: EditorProps) {
+  const prefersDark = usePrefersDark();
   const editor = useCreateBlockNote(
     collab !== undefined
       ? {
@@ -94,6 +116,7 @@ export default function Editor({
   return (
     <BlockNoteView
       editor={editor}
+      theme={prefersDark ? "dark" : "light"}
       editable={editable}
       onChange={() => {
         if (!loadingRef.current) {

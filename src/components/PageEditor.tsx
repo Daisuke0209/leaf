@@ -1,10 +1,18 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import ConnectButton from "@/components/ConnectButton";
 import Editor, { type EditorHandle } from "@/components/Editor";
+import PresenceAvatars from "@/components/Presence";
 import {
   collabEnabled,
   isLeader,
@@ -24,18 +32,56 @@ type SaveStatus = "saved" | "unsaved" | "saving" | "error" | "auth";
 
 const AUTOSAVE_DELAY_MS = 2500;
 
-const STATUS_LABEL: Record<SaveStatus, string> = {
-  saved: "Saved",
-  unsaved: "Unsaved",
-  saving: "Saving…",
-  error: "Save failed",
-  auth: "Reconnect needed",
+const STATUS_META: Record<SaveStatus, { label: string; dot: string }> = {
+  saved: { label: "Saved", dot: "bg-accent" },
+  unsaved: { label: "Unsaved", dot: "bg-amber-500" },
+  saving: { label: "Saving…", dot: "bg-amber-500 animate-pulse" },
+  error: { label: "Save failed", dot: "bg-red-500" },
+  auth: { label: "Reconnect needed", dot: "bg-red-500" },
 };
 
 type LoadState = "loading" | "loaded" | "not-found" | "error" | "auth";
 
 interface PageEditorProps {
   fileId: string;
+}
+
+function Shell({
+  headerRight,
+  children,
+}: {
+  headerRight?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-20 border-b border-border-soft bg-background/80 backdrop-blur">
+        <div className="mx-auto flex h-12 w-full max-w-6xl items-center justify-between px-6">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-sm font-semibold tracking-tight"
+          >
+            <Image src="/icon.png" alt="" width={20} height={20} className="rounded-[5px]" />
+            Leaf
+          </Link>
+          <div className="flex items-center gap-3">{headerRight}</div>
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-6xl px-6 py-10">{children}</main>
+    </div>
+  );
+}
+
+function StatusPill({ status, canEdit }: { status: SaveStatus; canEdit: boolean }) {
+  const meta = canEdit
+    ? STATUS_META[status]
+    : { label: "Read-only", dot: "bg-muted" };
+  return (
+    <span className="flex items-center gap-1.5 rounded-full border border-border-soft px-2.5 py-1 text-xs text-muted">
+      <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+      {meta.label}
+    </span>
+  );
 }
 
 /**
@@ -186,16 +232,16 @@ export default function PageEditor({ fileId }: PageEditorProps) {
 
   if (loadState === "loading") {
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 py-16 text-sm text-gray-500">
-        Loading…
-      </div>
+      <Shell>
+        <p className="text-sm text-muted">Loading…</p>
+      </Shell>
     );
   }
 
   if (loadState === "auth") {
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 py-16">
-        <p className="mb-4 text-sm text-gray-500">
+      <Shell>
+        <p className="mb-4 text-sm text-muted">
           Leaf needs access to Google Drive to open this page.
         </p>
         <ConnectButton
@@ -204,22 +250,22 @@ export default function PageEditor({ fileId }: PageEditorProps) {
             load();
           }}
         />
-      </div>
+      </Shell>
     );
   }
 
   if (loadState === "not-found" || loadState === "error") {
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 py-16">
-        <p className="mb-4 text-sm text-gray-500">
+      <Shell>
+        <p className="mb-4 text-sm text-muted">
           {loadState === "not-found"
             ? "Page not found."
             : "Failed to load this page."}
         </p>
-        <Link href="/" className="text-sm hover:underline">
-          ← Leaf
+        <Link href="/" className="text-sm text-accent hover:underline">
+          ← Back to Leaf
         </Link>
-      </div>
+      </Shell>
     );
   }
 
@@ -231,29 +277,22 @@ export default function PageEditor({ fileId }: PageEditorProps) {
   const userName = profile?.name ?? profile?.email ?? "Anonymous";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-8">
-      <div className="mb-6 flex items-center justify-between text-sm text-gray-500">
-        <Link href="/" className="hover:underline">
-          Leaf
-        </Link>
-        <span className="flex items-center gap-3">
+    <Shell
+      headerRight={
+        <>
+          {collab !== null && <PresenceAvatars session={collab} />}
           {status === "auth" && (
             <ConnectButton
               onConnected={() => void doSave()}
-              className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-900"
+              className="rounded-md border border-border-soft px-2 py-1 text-xs hover:bg-accent-soft disabled:opacity-50"
             >
               Reconnect
             </ConnectButton>
           )}
-          <span
-            className={
-              status === "error" || status === "auth" ? "text-red-600" : undefined
-            }
-          >
-            {canEdit ? STATUS_LABEL[status] : "Read-only"}
-          </span>
-        </span>
-      </div>
+          <StatusPill status={status} canEdit={canEdit} />
+        </>
+      }
+    >
       <input
         type="text"
         value={title}
@@ -261,7 +300,7 @@ export default function PageEditor({ fileId }: PageEditorProps) {
         placeholder="Untitled"
         aria-label="Page title"
         readOnly={!canEdit}
-        className="mb-4 w-full bg-transparent text-4xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
+        className="mb-5 w-full bg-transparent text-4xl font-bold tracking-tight outline-none placeholder:text-muted/40"
       />
       <Editor
         ref={editorRef}
@@ -271,6 +310,6 @@ export default function PageEditor({ fileId }: PageEditorProps) {
         user={{ name: userName, color: userColor(userName) }}
         editable={canEdit}
       />
-    </div>
+    </Shell>
   );
 }
