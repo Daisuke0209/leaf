@@ -1,0 +1,11 @@
+name: 機能要望
+description: Leaf への機能追加・改善を提案する
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案
+      description: 何に困っていて、どうなってほしいか。
+    validations:
+      required: true
