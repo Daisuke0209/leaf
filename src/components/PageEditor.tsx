@@ -15,6 +15,7 @@ import {
 } from "@/lib/collab";
 import {
   DriveNotFoundError,
+  ensureRoomKey,
   getMarkdownFile,
   updateMarkdownFile,
 } from "@/lib/google/drive";
@@ -48,10 +49,10 @@ export default function PageEditor({ fileId }: PageEditorProps) {
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<SaveStatus>("saved");
 
-  // Created once per mount (client-only component, StrictMode off).
-  const [collab] = useState<CollabSession | null>(() =>
-    collabEnabled() ? joinCollabRoom(fileId) : null
-  );
+  // Joined only after the Drive load succeeds: the room name needs the room
+  // key from the file's metadata, so Drive access gates room access. Stays
+  // null (solo editing) when collaboration is disabled or no key is available.
+  const [collab, setCollab] = useState<CollabSession | null>(null);
 
   const editorRef = useRef<EditorHandle>(null);
   // Latest title, readable from the debounced save callback.
@@ -71,12 +72,21 @@ export default function PageEditor({ fileId }: PageEditorProps) {
   // happen in promise callbacks, keeping the effect free of sync setState.
   const load = useCallback(() => {
     getMarkdownFile(fileId)
-      .then((doc) => {
+      .then(async (doc) => {
+        // Files created before collaboration existed have no room key yet;
+        // assign one (needs write access — read-only users stay solo).
+        let roomKey = doc.roomKey;
+        if (collabEnabled() && roomKey === null) {
+          roomKey = await ensureRoomKey(fileId);
+        }
         if (cancelledRef.current) return;
         titleRef.current = doc.title;
-        lastSavedRef.current = doc;
+        lastSavedRef.current = { title: doc.title, markdown: doc.markdown };
         setTitle(doc.title);
         setInitialMarkdown(doc.markdown);
+        if (collabEnabled() && roomKey !== null) {
+          setCollab(joinCollabRoom(fileId, roomKey));
+        }
         setLoadState("loaded");
       })
       .catch((err: unknown) => {

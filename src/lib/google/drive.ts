@@ -106,8 +106,21 @@ function buildMultipartBody(
 }
 
 /**
+ * Key under which the collaboration room key is stored in the file's
+ * `appProperties` — app-private Drive metadata that only users who can
+ * access the file (and only this app) can read. Knowing the room key is
+ * therefore equivalent to having Drive access to the file.
+ */
+const ROOM_KEY_PROP = "leafRoomKey";
+
+function newRoomKey(): string {
+  return crypto.randomUUID().replaceAll("-", "");
+}
+
+/**
  * Creates a new `.md` file and returns its ID. `folderId` is where Drive's
  * "New" menu was invoked; when absent the file lands in My Drive root.
+ * A collaboration room key is set at creation time.
  */
 export async function createMarkdownFile(
   doc: PageDocument,
@@ -117,6 +130,7 @@ export async function createMarkdownFile(
     {
       name: fileNameForTitle(doc.title),
       mimeType: MARKDOWN_MIME_TYPE,
+      appProperties: { [ROOM_KEY_PROP]: newRoomKey() },
       ...(folderId !== undefined ? { parents: [folderId] } : {}),
     },
     doc.markdown
@@ -134,25 +148,72 @@ export async function createMarkdownFile(
   return created.id;
 }
 
+export interface MarkdownFilePage extends PageDocument {
+  /** Collaboration room key, when one has been assigned to the file. */
+  roomKey: string | null;
+}
+
 /**
- * Fetches a page as `{ title, markdown }`. The title lives in the file name,
- * so this needs a metadata request in addition to the content download; the
- * two are independent and run in parallel.
+ * Fetches a page as `{ title, markdown, roomKey }`. Title and room key live
+ * in the file metadata, so this needs a metadata request in addition to the
+ * content download; the two are independent and run in parallel.
  */
-export async function getMarkdownFile(fileId: string): Promise<PageDocument> {
+export async function getMarkdownFile(
+  fileId: string
+): Promise<MarkdownFilePage> {
   const encodedId = encodeURIComponent(fileId);
 
   const [metaRes, contentRes] = await Promise.all([
-    driveFetch(`${DRIVE_API}/files/${encodedId}?fields=name`),
+    driveFetch(`${DRIVE_API}/files/${encodedId}?fields=name,appProperties`),
     driveFetch(`${DRIVE_API}/files/${encodedId}?alt=media`),
   ]);
   await ensureOk(metaRes, "File metadata", fileId);
   await ensureOk(contentRes, "File download", fileId);
 
-  const meta = (await metaRes.json()) as { name: string };
+  const meta = (await metaRes.json()) as {
+    name: string;
+    appProperties?: Record<string, string>;
+  };
   const markdown = await contentRes.text();
 
-  return { title: titleFromFileName(meta.name), markdown };
+  return {
+    title: titleFromFileName(meta.name),
+    markdown,
+    roomKey: meta.appProperties?.[ROOM_KEY_PROP] ?? null,
+  };
+}
+
+/**
+ * Assigns a room key to a file that doesn't have one yet (files created
+ * before collaboration existed, or by older versions). Re-reads after
+ * writing so concurrent assigners converge on the same key. Returns null
+ * when the key can't be written (e.g. read-only access) — the caller should
+ * fall back to solo editing.
+ */
+export async function ensureRoomKey(fileId: string): Promise<string | null> {
+  const encodedId = encodeURIComponent(fileId);
+  try {
+    const patchRes = await driveFetch(`${DRIVE_API}/files/${encodedId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ appProperties: { [ROOM_KEY_PROP]: newRoomKey() } }),
+    });
+    if (!patchRes.ok) {
+      return null;
+    }
+    const readRes = await driveFetch(
+      `${DRIVE_API}/files/${encodedId}?fields=appProperties`
+    );
+    if (!readRes.ok) {
+      return null;
+    }
+    const meta = (await readRes.json()) as {
+      appProperties?: Record<string, string>;
+    };
+    return meta.appProperties?.[ROOM_KEY_PROP] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**

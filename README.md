@@ -29,6 +29,9 @@ Client-only static site (Next.js `output: "export"`) — no server, no secrets.
   cursors, title synced through the Yjs doc. The room's awareness "leader"
   is the only client that autosaves to Drive. Enabled by setting
   `NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_KEY`; without it the editor runs solo.
+  Room names include a random key stored in the file's app-private Drive
+  metadata (`appProperties`), so joining a room requires Drive access to
+  the file; the room is only joined after the Drive load succeeds.
 
 ## Development
 

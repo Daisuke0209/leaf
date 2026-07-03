@@ -5,15 +5,17 @@ import * as Y from "yjs";
 /**
  * Real-time collaboration via Liveblocks + Yjs.
  *
- * One Liveblocks room per Drive file (`leaf:<fileId>`). The Yjs doc holds
- * the page body (BlockNote's fragment) and a small `meta` map for the title.
- * Google Drive stays the persisted artifact: the awareness "leader" (lowest
- * client id in the room) is the only client that autosaves to Drive, so a
- * room full of editors produces one writer.
+ * One Liveblocks room per Drive file (`leaf:<fileId>:<roomKey>`). The Yjs
+ * doc holds the page body (BlockNote's fragment) and a small `meta` map for
+ * the title. Google Drive stays the persisted artifact: the awareness
+ * "leader" (lowest client id in the room) is the only client that autosaves
+ * to Drive, so a room full of editors produces one writer.
  *
- * Note on access: with a Liveblocks *public* key, anyone who knows the Drive
- * file ID can join the room. File IDs are high-entropy (link-sharing level
- * security); tightening this requires an auth endpoint + secret key.
+ * Access control: the room name includes a random key stored in the file's
+ * app-private Drive metadata (`appProperties`), so only users who can read
+ * the file via Drive can learn the room name. Remaining gaps (documented in
+ * issue #3): revoked users keep old keys, and the Liveblocks public key
+ * still allows creating unrelated rooms.
  */
 
 export interface CollabSession {
@@ -41,8 +43,8 @@ function getClient(): Client {
   return client;
 }
 
-export function joinCollabRoom(fileId: string): CollabSession {
-  const { room, leave } = getClient().enterRoom(`leaf:${fileId}`);
+export function joinCollabRoom(fileId: string, roomKey: string): CollabSession {
+  const { room, leave } = getClient().enterRoom(`leaf:${fileId}:${roomKey}`);
   const doc = new Y.Doc();
   const provider = new LiveblocksYjsProvider(room, doc);
   return {
