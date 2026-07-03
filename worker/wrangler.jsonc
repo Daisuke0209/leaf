@@ -1,0 +1,7 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "leaf-auth",
+  "main": "index.ts",
+  "compatibility_date": "2026-06-01"
+  // Secret (set once): npx wrangler secret put LIVEBLOCKS_SECRET_KEY -c worker/wrangler.jsonc
+}

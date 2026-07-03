@@ -2,6 +2,8 @@ import { createClient, type Client } from "@liveblocks/client";
 import { LiveblocksYjsProvider } from "@liveblocks/yjs";
 import * as Y from "yjs";
 
+import { getAccessToken } from "./google/gis";
+
 /**
  * Real-time collaboration via Liveblocks + Yjs.
  *
@@ -11,9 +13,10 @@ import * as Y from "yjs";
  * client id in the room) is the only client that autosaves to Drive, so a
  * room full of editors produces one writer.
  *
- * Note on access: with a Liveblocks *public* key, anyone who knows the Drive
- * file ID can join the room. File IDs are high-entropy (link-sharing level
- * security); tightening this requires an auth endpoint + secret key.
+ * Access control follows Google Drive's own ACL: joining a room requires a
+ * token from the auth worker (see worker/index.ts), which verifies with the
+ * user's Google token that the file is accessible *right now*. Drive
+ * editors get full access, viewers get read-only.
  */
 
 export interface CollabSession {
@@ -27,16 +30,31 @@ export interface CollabSession {
 }
 
 export function collabEnabled(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_KEY);
+  return Boolean(process.env.NEXT_PUBLIC_LIVEBLOCKS_AUTH_URL);
 }
 
 let client: Client | null = null;
 
 function getClient(): Client {
   if (client === null) {
-    const publicApiKey = process.env.NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_KEY;
-    if (!publicApiKey) throw new Error("NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_KEY is not set");
-    client = createClient({ publicApiKey });
+    const authUrl = process.env.NEXT_PUBLIC_LIVEBLOCKS_AUTH_URL;
+    if (!authUrl) throw new Error("NEXT_PUBLIC_LIVEBLOCKS_AUTH_URL is not set");
+    client = createClient({
+      authEndpoint: async (room) => {
+        // Throws AuthNeededError without a Google token — Liveblocks treats
+        // it as a failed (re-)authorization and the room stays inaccessible.
+        const googleToken = await getAccessToken();
+        const res = await fetch(authUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ room, googleToken }),
+        });
+        if (!res.ok) {
+          throw new Error(`Collab authorization failed (${res.status})`);
+        }
+        return (await res.json()) as { token: string };
+      },
+    });
   }
   return client;
 }
