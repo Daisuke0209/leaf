@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import ConnectButton from "@/components/ConnectButton";
+import ConnectButton, { primaryClasses } from "@/components/ConnectButton";
 import Editor, { type EditorHandle } from "@/components/Editor";
 import PresenceAvatars from "@/components/Presence";
 import {
@@ -257,14 +257,32 @@ export default function PageEditor({ fileId }: PageEditorProps) {
   if (loadState === "not-found" || loadState === "error") {
     return (
       <Shell>
-        <p className="mb-4 text-sm text-muted">
+        <p className="mb-3 text-sm font-medium">
           {loadState === "not-found"
-            ? "Page not found."
+            ? "Leaf can't find this file."
             : "Failed to load this page."}
         </p>
-        <Link href="/" className="text-sm text-accent hover:underline">
-          ← Back to Leaf
-        </Link>
+        {/* With the drive.file scope, even a file that IS shared with you in
+            Drive stays invisible to Leaf until you open it once through the
+            Drive UI, which grants per-file access. Walk the user there. */}
+        <p className="mb-6 max-w-md text-sm leading-relaxed text-muted">
+          If this file was shared with you, Leaf may simply not have access to
+          it yet. Open it once from Google Drive — right-click the file →{" "}
+          <strong className="text-foreground">Open with</strong> →{" "}
+          <strong className="text-foreground">Leaf</strong> — and Drive will
+          grant access. After that, this link will work too.
+        </p>
+        <div className="flex items-center gap-4">
+          <a
+            href={`https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`}
+            className={primaryClasses}
+          >
+            Open in Google Drive
+          </a>
+          <Link href="/" className="text-sm text-accent hover:underline">
+            ← Back to Leaf
+          </Link>
+        </div>
       </Shell>
     );
   }
