@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
 import ConnectButton, { primaryClasses } from "@/components/ConnectButton";
@@ -36,6 +37,7 @@ export default function Home() {
           experience. Connect Leaf to your Drive to get started.
         </p>
         <ConnectButton />
+        <Footer />
       </main>
     );
   }
@@ -77,6 +79,20 @@ export default function Home() {
       <a href="https://drive.google.com" className={`inline-block ${primaryClasses}`}>
         Open Google Drive
       </a>
+      <Footer />
     </main>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="mt-16 flex gap-4 border-t border-border-soft pt-6 text-xs text-muted">
+      <Link href="/privacy/" className="hover:underline">
+        Privacy Policy
+      </Link>
+      <Link href="/terms/" className="hover:underline">
+        Terms of Service
+      </Link>
+    </footer>
   );
 }
