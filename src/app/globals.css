@@ -51,3 +51,18 @@ body {
   /* Sit on the page's paper background instead of the library's white. */
   background: transparent;
 }
+
+/*
+ * The slash menu gets an inline max-height from floating-ui (sized to the
+ * viewport), but the library CSS has no overflow rule — items that don't
+ * fit are simply cut off. Make the menu scroll instead.
+ *
+ * overflow-anchor: BlockNote re-renders the menu on its own scroll events,
+ * and Chrome's scroll anchoring then "corrects" the scroll position against
+ * those mutations, pinning the menu mid-scroll on trackpads. Menus don't
+ * need anchoring — disable it.
+ */
+.bn-suggestion-menu {
+  overflow-y: auto;
+  overflow-anchor: none;
+}
