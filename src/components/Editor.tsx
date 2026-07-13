@@ -31,6 +31,31 @@ function usePrefersDark(): boolean {
   );
 }
 
+/**
+ * BlockNote repositions its floating menus on every scroll event via a
+ * capture listener on the document — including scroll events coming from
+ * *inside* its own suggestion menu. Each internal scroll then triggers a
+ * re-render, and the resulting DOM churn fights the user's trackpad,
+ * pinning the menu mid-scroll. The menu's own scrolling carries no
+ * positioning information, so swallow it before BlockNote sees it
+ * (window capture runs before document capture).
+ */
+function useSuppressMenuScrollFeedback() {
+  useEffect(() => {
+    const suppress = (e: Event) => {
+      if (
+        e.target instanceof Element &&
+        e.target.closest(".bn-suggestion-menu") !== null
+      ) {
+        e.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener("scroll", suppress, { capture: true });
+    return () =>
+      window.removeEventListener("scroll", suppress, { capture: true });
+  }, []);
+}
+
 export interface EditorHandle {
   /** Serializes the current document to Markdown (lossy). */
   getMarkdown(): string;
@@ -63,6 +88,7 @@ export default function Editor({
   ref,
 }: EditorProps) {
   const prefersDark = usePrefersDark();
+  useSuppressMenuScrollFeedback();
   const editor = useCreateBlockNote(
     collab !== undefined
       ? {
